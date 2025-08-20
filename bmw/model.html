@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Select Your BMW</title>
+  <script src="bmw-data.js"></script>
+  <style>
+    body{ margin:0; font-family: Arial, Helvetica, sans-serif; background:#0c0c0e; color:#fff; }
+    .wrap{ max-width:900px; margin:0 auto; padding:32px 20px; }
+    h1{ font-size:2rem; margin:4px 0 14px; }
+    .box{ background:#101013; border:1px solid #1a1a1f; border-radius:16px; padding:18px; }
+    label{ display:block; margin-bottom:6px; opacity:.8; }
+    input, button{ font-size:1rem; }
+    input{ width:100%; padding:12px 14px; border-radius:10px; border:1px solid #25252c; background:#0b0b0f; color:#fff; }
+    .actions{ margin-top:14px; display:flex; gap:10px; }
+    .btn{ padding:10px 16px; border-radius:10px; border:1px solid #2a2a33; background:#111217; color:#fff; cursor:pointer; }
+    .btn.primary{ background:#0d3a63; border-color:#155a9b; }
+    .hint{ opacity:.7; margin-top:10px; }
+    .list{ margin-top:18px; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:8px; }
+    .pill{ padding:8px 12px; border:1px solid #24242b; border-radius:999px; background:#0e0e12; cursor:pointer; text-align:center; }
+    @media (max-width:720px){ .list{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Pick your BMW</h1>
+    <div class="box">
+      <label for="model">Start typing a model name</label>
+      <input id="model" list="models" placeholder="e.g., M3, X5, 7 Series, iX, Z4" />
+      <div class="actions">
+        <button class="btn primary" id="go">Submit</button>
+        <a class="btn" href="index.html">Home</a>
+      </div>
+      <div class="hint">Tip: You can type partial names like "m3" or "x" — we’ll figure it out.</div>
+      <datalist id="models"></datalist>
+      <div class="list" id="quick"></div>
+    </div>
+  </div>
+
+  <script>
+    // Hydrate datalist and quick picks from dataset
+    const dl = document.getElementById('models');
+    const quick = document.getElementById('quick');
+    (bmwModels || []).forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      dl.appendChild(opt);
+    });
+    // Some popular quick picks
+    const picks = ['BMW M3', 'BMW X5', 'BMW 7 Series', 'BMW iX', 'BMW M5', 'BMW X3', 'BMW 3 Series', 'BMW i4'];
+    picks.forEach(name => {
+      const exists = bmwModels.find(m => m.name === name);
+      if(exists){
+        const p = document.createElement('button');
+        p.className = 'pill';
+        p.textContent = name;
+        p.onclick = () => { localStorage.setItem('selectedBMW', name); location.href='details.html'; };
+        quick.appendChild(p);
+      }
+    });
+
+    // Submit handler
+    document.getElementById('go').onclick = () => {
+      const val = (document.getElementById('model').value || '').trim();
+      if(!val){ alert('Please enter a model'); return; }
+      localStorage.setItem('selectedBMW', val);
+      location.href = 'details.html';
+    };
+
+    // Enter key submits
+    document.getElementById('model').addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){ document.getElementById('go').click(); }
+    });
+  </script>
+</body>
+</html>

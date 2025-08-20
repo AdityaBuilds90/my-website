@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BMW Details</title>
+  <script src="bmw-data.js"></script>
+  <style>
+    :root{ --bmw-blue:#0066B1; }
+    body{ margin:0; font-family: Arial, Helvetica, sans-serif; background:#0b0b0b; color:#fff; }
+    header{ padding:18px 16px; border-bottom:1px solid #1a1a1a; display:flex; align-items:center; gap:10px; }
+    header a{ color:#9cd3ff; text-decoration:none; }
+    .container{ max-width:1100px; margin:0 auto; padding:24px; }
+    .title{ font-size:2rem; margin:8px 0 4px; }
+    .sub{ opacity:.8; }
+    .grid{ display:grid; grid-template-columns: 1.2fr .8fr; gap:22px; margin-top:22px; }
+    .card{ background:#101010; border:1px solid #1c1c1c; border-radius:16px; padding:16px; }
+    .imgbox{ position:relative; overflow:hidden; border-radius:14px; background:#080808; }
+    .imgwrap{ position:relative; }
+    .carimg{ width:100%; display:block; }
+    .tint{ position:absolute; inset:0; mix-blend:multiply; opacity:.9; }
+    .swatches{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .swatch{ width:28px; height:28px; border-radius:50%; border:2px solid #2a2a2a; cursor:pointer; }
+    .specs{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .spec{ background:#0f0f0f; border:1px solid #1d1d1d; padding:12px; border-radius:12px; }
+    .label{ opacity:.75; font-size:.85rem; }
+    .val{ font-size:1.1rem; font-weight:700; }
+    .notfound{ text-align:center; padding:60px 20px; }
+    .suggestions a{ color:#9cd3ff; text-decoration:none; margin-right:10px; }
+    @media (max-width: 920px){ .grid{ grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="model.html">← Back</a>
+    <span style="opacity:.6">/</span>
+    <a href="index.html">Home</a>
+  </header>
+  <div class="container" id="app"></div>
+
+  <script>
+    const app = document.getElementById('app');
+    const inputRaw = localStorage.getItem('selectedBMW') || '';
+
+    function normalize(s){
+      return (s||'')
+        .toLowerCase()
+        .replace(/bmw/g,'')
+        .replace(/competition|xdrive|gran\s*coupe|gran\s*turismo|touring|sedan|coupe|convertible|roadster|wagon|suv|gt/gi,'')
+        .replace(/[()\-]/g,' ')
+        .replace(/\s+/g,' ')
+        .trim();
+    }
+
+    function editDistance(a,b){
+      a = a || ''; b = b || '';
+      const dp = Array.from({length:a.length+1},()=>Array(b.length+1).fill(0));
+      for(let i=0;i<=a.length;i++) dp[i][0]=i;
+      for(let j=0;j<=b.length;j++) dp[0][j]=j;
+      for(let i=1;i<=a.length;i++){
+        for(let j=1;j<=b.length;j++){
+          const cost = a[i-1] === b[j-1] ? 0 : 1;
+          dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+cost);
+        }
+      }
+      return dp[a.length][b.length];
+    }
+
+    function bestMatch(query, items){
+      const qn = normalize(query);
+      // 1) exact (normalized) match
+      let exact = items.find(m => normalize(m.name) === qn);
+      if(exact) return exact;
+
+      // 2) includes match
+      let inc = items.find(m => normalize(m.name).includes(qn) || qn.includes(normalize(m.name)));
+      if(inc) return inc;
+
+      // 3) token-based match
+      const tokens = qn.split(' ').filter(Boolean);
+      inc = items.find(m => tokens.every(t => normalize(m.name).includes(t)));
+      if(inc) return inc;
+
+      // 4) Levenshtein best score
+      let best = null, bestScore = Infinity;
+      items.forEach(m => {
+        const dn = normalize(m.name);
+        const score = editDistance(qn, dn);
+        if(score < bestScore){ best = m; bestScore = score; }
+      });
+      return best;
+    }
+
+    function topSuggestions(query, items, n=6){
+      const qn = normalize(query);
+      const scored = items.map(m => {
+        const dn = normalize(m.name);
+        return { m, s: editDistance(qn, dn) };
+      }).sort((a,b)=>a.s-b.s);
+      return scored.slice(0,n).map(x=>x.m);
+    }
+
+    const model = bestMatch(inputRaw, bmwModels);
+
+    if(!model || !inputRaw){
+      const sugg = topSuggestions(inputRaw, bmwModels, 10);
+      app.innerHTML = '<div class="notfound"><h2>Model not found</h2><p>We couldn\'t locate "'+ (inputRaw||'') +'". Did you mean:</p><div class="suggestions" id="sugs"></div><p style="opacity:.7;margin-top:12px;">Tip: try "M3", "X5", "7 Series", or pick from the list on the previous page.</p></div>';
+      const sugs = document.getElementById('sugs');
+      sugg.forEach(s => {
+        const a = document.createElement('a');
+        a.href = '#';
+        a.textContent = s.name;
+        a.onclick = (e)=>{ e.preventDefault(); localStorage.setItem('selectedBMW', s.name); location.reload(); };
+        sugs.appendChild(a);
+      });
+    } else {
+      app.innerHTML = `
+        <div class="title">${model.name}</div>
+        <div class="sub">${model.year} • ${model.body || '—'}</div>
+        <div class="grid">
+          <div class="card">
+            <div class="imgbox">
+              <div class="imgwrap">
+                <img id="carimg" class="carimg" src="${model.image}" alt="${model.name}" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/3/38/BMW_roundel.svg'">
+                <div id="tint" class="tint" style="background:${model.colors?.[0]?.hex || '#0000'}"></div>
+              </div>
+            </div>
+            <div class="swatches" id="swatches"></div>
+          </div>
+          <div class="card">
+            <div class="specs">
+              <div class="spec"><div class="label">Horsepower</div><div class="val">${model.hp} hp</div></div>
+              <div class="spec"><div class="label">Top speed</div><div class="val">${model.topSpeed} km/h</div></div>
+              <div class="spec"><div class="label">0–100 km/h</div><div class="val">${model.accel || '—'}</div></div>
+              <div class="spec"><div class="label">Drivetrain</div><div class="val">${model.drive || '—'}</div></div>
+              <div class="spec"><div class="label">Transmission</div><div class="val">${model.trans || '—'}</div></div>
+              <div class="spec"><div class="label">Price (USD)</div><div class="val">${model.price || '—'}</div></div>
+            </div>
+          </div>
+        </div>`;
+      const sw = document.getElementById('swatches');
+      (model.colors || []).forEach(c=>{
+        const b = document.createElement('button');
+        b.className = 'swatch';
+        b.title = c.name;
+        b.style.background = c.hex;
+        b.onclick = ()=> document.getElementById('tint').style.background = c.hex;
+        sw.appendChild(b);
+      });
+    }
+  </script>
+</body>
+</html>
